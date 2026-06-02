@@ -2,7 +2,23 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Play, Pause, Square, AlertCircle, Plus, Check, Trash2, Target, Clock, Zap, Brain, Coffee, Moon } from 'lucide-react';
+
+// استيراد الأيقونات بشكل صحيح
+import { 
+  Play, 
+  Pause, 
+  Square, 
+  AlertCircle, 
+  Plus, 
+  Check, 
+  Trash2, 
+  Target, 
+  Clock, 
+  Zap,
+  Brain,
+  Coffee,
+  Moon 
+} from 'lucide-react';
 
 // ============ أنواع البيانات ============
 interface StudySession {
@@ -11,7 +27,6 @@ interface StudySession {
   endTime: Date;
   durationMinutes: number;
   distractions: number;
-  subject?: string;
 }
 
 interface Task {
@@ -27,6 +42,14 @@ interface DailyStats {
   totalDistractions: number;
   focusScore: number;
   level: 'ضعيف' | 'متوسط' | 'ممتاز';
+}
+
+interface Recommendation {
+  title: string;
+  message: string;
+  action: string;
+  suggestedDuration: number;
+  icon: JSX.Element;
 }
 
 // ============ دوال التحليل ============
@@ -56,7 +79,7 @@ const calculateFocusScore = (sessions: StudySession[]): DailyStats => {
   };
 };
 
-const getRecommendation = (stats: DailyStats) => {
+const getRecommendation = (stats: DailyStats): Recommendation => {
   if (stats.focusScore < 35) {
     return {
       title: "🌿 خذ نفسًا عميقًا",
@@ -162,7 +185,7 @@ const TasksList = () => {
     const saved = localStorage.getItem('enjaz_tasks');
     if (saved) {
       const parsed = JSON.parse(saved);
-      setTasks(parsed.map((t: any) => ({ ...t, createdAt: new Date(t.createdAt) })));
+      setTasks(parsed.map((t: Task) => ({ ...t, createdAt: new Date(t.createdAt) })));
     }
   }, []);
 
@@ -290,13 +313,13 @@ export default function Home() {
     focusScore: 0,
     level: 'ضعيف'
   });
-  const [recommendation, setRecommendation] = useState<any>(null);
+  const [recommendation, setRecommendation] = useState<Recommendation | null>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem('enjaz_sessions');
     if (saved) {
       const parsed = JSON.parse(saved);
-      const loaded = parsed.map((s: any) => ({
+      const loaded = parsed.map((s: StudySession) => ({
         ...s,
         startTime: new Date(s.startTime),
         endTime: new Date(s.endTime)
@@ -382,7 +405,7 @@ export default function Home() {
                     <p className="text-[#8B9E6E] mb-3">{recommendation.message}</p>
                     <div className="bg-[#8B9E6E]/10 rounded-2xl p-3 border border-[#8B9E6E]/20">
                       <strong className="text-[#5C4B3A]">📌 التوصية:</strong>
-                      <span className="text-[#8B9E6E] ml-2">{recommendation.action}</span>
+                      <span className="text-[#8B9E6E] mr-2">{recommendation.action}</span>
                     </div>
                   </div>
                 </div>
@@ -393,7 +416,7 @@ export default function Home() {
               <div className="bg-white/60 backdrop-blur-md rounded-3xl border border-[#8B9E6E]/20 shadow-xl p-6">
                 <h3 className="text-xl font-bold mb-4 text-[#5C4B3A]">📊 آخر الجلسات</h3>
                 <div className="space-y-2">
-                  {sessions.slice(0, 5).map(session => (
+                  {sessions.slice(0, 5).map((session) => (
                     <div key={session.id} className="flex justify-between items-center p-3 rounded-xl bg-white/40 hover:bg-white/60 transition-all duration-200">
                       <div>
                         <span className="font-mono text-[#5C4B3A]">{session.durationMinutes} دقيقة</span>
