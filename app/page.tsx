@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react';
 // ============ أنواع البيانات ============
 interface DistractionLog {
   id: string;
-  timeFromStart: number; // بالثواني
+  timeFromStart: number; // بالثواني من بداية الجلسة
   reason: string;
 }
 
@@ -55,13 +55,18 @@ export default function Home() {
   useEffect(() => {
     const saved = localStorage.getItem('enjaz_sessions');
     if (saved) {
-      setSessions(JSON.parse(saved));
+      try {
+        const parsed = JSON.parse(saved);
+        setSessions(parsed);
+      } catch (e) {
+        console.error('خطأ في تحميل البيانات', e);
+      }
     }
   }, []);
 
   // حساب الإحصائيات
-  const totalMinutes = sessions.reduce((sum, s) => sum + s.durationMinutes, 0);
-  const totalDistractions = sessions.reduce((sum, s) => sum + s.distractions.length, 0);
+  const totalMinutes = sessions.reduce((sum, s) => sum + (s.durationMinutes || 0), 0);
+  const totalDistractions = sessions.reduce((sum, s) => sum + (s.distractions?.length || 0), 0);
   const sessionsCount = sessions.length;
   
   let focusScore = (sessionsCount * 10) - (totalDistractions * 5) + Math.floor(totalMinutes / 5);
@@ -75,6 +80,7 @@ export default function Home() {
   const startStudy = () => {
     setIsActive(true);
     setCurrentDistractions([]);
+    setSeconds(0);
   };
 
   const pauseStudy = () => {
@@ -91,7 +97,7 @@ export default function Home() {
     if (selectedReason) {
       const newDistraction: DistractionLog = {
         id: Date.now().toString(),
-        timeFromStart: seconds,
+        timeFromStart: seconds, // الوقت من بداية الجلسة بالثواني
         reason: selectedReason
       };
       setCurrentDistractions([...currentDistractions, newDistraction]);
@@ -127,9 +133,11 @@ export default function Home() {
   };
 
   const formatTimeFromSeconds = (totalSeconds: number) => {
+    if (isNaN(totalSeconds)) return '0 ثانية';
     const mins = Math.floor(totalSeconds / 60);
     const secs = totalSeconds % 60;
     if (mins === 0) return `${secs} ثانية`;
+    if (secs === 0) return `${mins} دقيقة`;
     return `${mins} دقيقة و ${secs} ثانية`;
   };
 
@@ -242,19 +250,19 @@ export default function Home() {
                           🕐 {new Date(session.startTime).toLocaleTimeString('ar-SA')}
                         </span>
                         <span className="text-sm text-[#8B9E6E]">
-                          {session.durationMinutes} دقيقة • {session.distractions.length} تشتت
+                          {session.durationMinutes} دقيقة • {session.distractions?.length || 0} تشتت
                         </span>
                       </div>
                       
-                      {/* تفاصيل التشتتات */}
-                      {session.distractions.length > 0 && (
+                      {/* تفاصيل التشتتات مع الوقت من بداية الجلسة */}
+                      {session.distractions && session.distractions.length > 0 && (
                         <div className="mt-2 mr-4">
                           <p className="text-sm font-semibold text-[#C4A27A] mb-1">📝 تفاصيل التشتت:</p>
                           <div className="space-y-1">
-                            {session.distractions.map((dist, idx) => (
+                            {session.distractions.map((dist: DistractionLog, idx: number) => (
                               <div key={dist.id} className="text-sm text-[#8B9E6E] flex items-center gap-2">
                                 <span className="text-xs">#{idx + 1}</span>
-                                <span className="font-mono">⏱ {formatTimeFromSeconds(dist.timeFromStart)}</span>
+                                <span className="font-mono">⏱ بعد {formatTimeFromSeconds(dist.timeFromStart)}</span>
                                 <span>→</span>
                                 <span>{dist.reason}</span>
                               </div>
@@ -305,7 +313,7 @@ export default function Home() {
       {showReasonModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6">
-            <h3 className="text-xl font-bold mb-4 text-[#5C4B3A">🤔 ما سبب التشتت؟</h3>
+            <h3 className="text-xl font-bold mb-4 text-[#5C4B3A]">🤔 ما سبب التشتت؟</h3>
             <div className="space-y-2 max-h-96 overflow-y-auto mb-6">
               {distractionReasons.map((reason) => (
                 <button
@@ -353,7 +361,13 @@ function TasksList() {
 
   useEffect(() => {
     const saved = localStorage.getItem('enjaz_tasks');
-    if (saved) setTasks(JSON.parse(saved));
+    if (saved) {
+      try {
+        setTasks(JSON.parse(saved));
+      } catch (e) {
+        setTasks([]);
+      }
+    }
   }, []);
 
   const saveTasks = (updatedTasks: any[]) => {
@@ -384,7 +398,7 @@ function TasksList() {
           onChange={(e) => setNewTask(e.target.value)}
           onKeyPress={(e) => e.key === 'Enter' && addTask()}
           placeholder="أضف مهمة جديدة..."
-          className="flex-1 px-4 py-2 rounded-xl bg-white/60 border border-[#8B9E6E]/30 focus:outline-none focus:border-[#8B9E6E] text-[#5C4B3A]"
+          className="flex-1 px-4 py-2 rounded-xl bg-white/60 border border-[#8B9E6E]/30 focus:outline-none focus:border-[#8B9E6E] text-[#5C4B3A] placeholder:text-[#8B9E6E]/50"
         />
         <button onClick={addTask} className="px-4 py-2 rounded-xl font-medium bg-[#8B9E6E] hover:bg-[#7A8D5E] text-white">➕</button>
       </div>
@@ -393,14 +407,14 @@ function TasksList() {
           <p className="text-[#8B9E6E]/60 text-center py-4">لا توجد مهام بعد</p>
         ) : (
           tasks.map((task: any) => (
-            <div key={task.id} className="flex items-center gap-3 p-3 rounded-xl bg-white/40">
+            <div key={task.id} className="flex items-center gap-3 p-3 rounded-xl bg-white/40 hover:bg-white/60 transition-all">
               <button onClick={() => toggleTask(task.id)}>
-                <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center ${task.completed ? 'bg-[#8B9E6E] border-[#8B9E6E]' : 'border-[#8B9E6E]/40'}`}>
+                <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${task.completed ? 'bg-[#8B9E6E] border-[#8B9E6E]' : 'border-[#8B9E6E]/40'}`}>
                   {task.completed && '✓'}
                 </div>
               </button>
               <span className={`flex-1 text-[#5C4B3A] ${task.completed ? 'line-through text-[#8B9E6E]/60' : ''}`}>{task.text}</span>
-              <button onClick={() => deleteTask(task.id)} className="text-[#C4A27A]">🗑️</button>
+              <button onClick={() => deleteTask(task.id)} className="text-[#C4A27A] hover:text-[#8B5A3A] transition-all">🗑️</button>
             </div>
           ))
         )}
