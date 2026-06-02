@@ -1,7 +1,7 @@
 // app/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 // ============ أنواع البيانات ============
 interface StudySession {
@@ -12,15 +12,8 @@ interface StudySession {
   distractions: number;
 }
 
-interface Task {
-  id: string;
-  text: string;
-  completed: boolean;
-  createdAt: Date;
-}
-
 // ============ دوال التحليل ============
-const calculateFocusScore = (sessions: StudySession[]) => {
+const calculateStats = (sessions: StudySession[]) => {
   let totalMinutes = 0;
   let totalDistractions = 0;
   
@@ -47,18 +40,18 @@ const calculateFocusScore = (sessions: StudySession[]) => {
 };
 
 // ============ مكون المؤقت ============
-const StudyTimer = ({ onSessionEnd, onDistractionRecord }: { 
-  onSessionEnd: (duration: number, distractions: number) => void;
-  onDistractionRecord: () => void;
-}) => {
+const StudyTimer = ({ onSessionComplete }: { onSessionComplete: (duration: number, distractions: number) => void }) => {
   const [isActive, setIsActive] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [distractions, setDistractions] = useState(0);
 
+  // تشغيل المؤقت
   useEffect(() => {
-    let interval: any;
+    let interval: NodeJS.Timeout;
     if (isActive) {
-      interval = setInterval(() => setSeconds((s: number) => s + 1), 1000);
+      interval = setInterval(() => {
+        setSeconds(prev => prev + 1);
+      }, 1000);
     }
     return () => clearInterval(interval);
   }, [isActive]);
@@ -71,29 +64,23 @@ const StudyTimer = ({ onSessionEnd, onDistractionRecord }: {
 
   const handleDistraction = () => {
     if (isActive) {
-      setDistractions((d: number) => d + 1);
-      onDistractionRecord(); // إعلام الصفحة الرئيسية بتسجيل تشتت
+      setDistractions(prev => prev + 1);
     }
   };
 
   const endSession = () => {
-    if (isActive && seconds >= 60) { // على الأقل دقيقة واحدة
-      onSessionEnd(Math.floor(seconds / 60), distractions);
+    if (isActive && seconds >= 60) {
+      onSessionComplete(Math.floor(seconds / 60), distractions);
+      // إعادة تعيين المؤقت
       setIsActive(false);
       setSeconds(0);
       setDistractions(0);
-    } else if (seconds < 60 && seconds > 0) {
-      alert('الرجاء الدراسة لمدة دقيقة على الأقل لتسجيل الجلسة');
+    } else if (seconds > 0 && seconds < 60) {
+      alert('⚠️ الرجاء الدراسة لمدة دقيقة على الأقل لتسجيل الجلسة');
       setIsActive(false);
       setSeconds(0);
       setDistractions(0);
     }
-  };
-
-  const cancelSession = () => {
-    setIsActive(false);
-    setSeconds(0);
-    setDistractions(0);
   };
 
   return (
@@ -104,19 +91,25 @@ const StudyTimer = ({ onSessionEnd, onDistractionRecord }: {
       
       <div className="flex gap-4 justify-center mb-6 flex-wrap">
         {!isActive ? (
-          <button onClick={() => setIsActive(true)} className="px-8 py-3 rounded-2xl font-medium bg-[#8B9E6E] hover:bg-[#7A8D5E] text-white transition-all">
+          <button 
+            onClick={() => setIsActive(true)} 
+            className="px-8 py-3 rounded-2xl font-medium bg-[#8B9E6E] hover:bg-[#7A8D5E] text-white transition-all"
+          >
             ▶ بدء الدراسة
           </button>
         ) : (
           <>
-            <button onClick={() => setIsActive(false)} className="px-6 py-3 rounded-2xl font-medium bg-[#D4C5B0] hover:bg-[#C9BAA5] text-[#5C4B3A] transition-all">
+            <button 
+              onClick={() => setIsActive(false)} 
+              className="px-6 py-3 rounded-2xl font-medium bg-[#D4C5B0] hover:bg-[#C9BAA5] text-[#5C4B3A] transition-all"
+            >
               ⏸ إيقاف مؤقت
             </button>
-            <button onClick={endSession} className="px-6 py-3 rounded-2xl font-medium bg-[#8B9E6E] hover:bg-[#7A8D5E] text-white transition-all">
+            <button 
+              onClick={endSession} 
+              className="px-6 py-3 rounded-2xl font-medium bg-[#8B9E6E] hover:bg-[#7A8D5E] text-white transition-all"
+            >
               ✅ إنهاء الجلسة
-            </button>
-            <button onClick={cancelSession} className="px-6 py-3 rounded-2xl font-medium bg-red-500/20 hover:bg-red-500/30 text-red-600 transition-all">
-              ✖ إلغاء
             </button>
           </>
         )}
@@ -127,7 +120,7 @@ const StudyTimer = ({ onSessionEnd, onDistractionRecord }: {
           onClick={handleDistraction}
           className="w-full px-6 py-3 rounded-2xl font-medium bg-orange-500/20 hover:bg-orange-500/30 text-orange-700 border border-orange-500/30 transition-all"
         >
-          🔔 تسجيل تشتت (تم تسجيل {distractions})
+          🔔 تسجيل تشتت (عدد التشتتات: {distractions})
         </button>
       )}
     </div>
@@ -135,16 +128,17 @@ const StudyTimer = ({ onSessionEnd, onDistractionRecord }: {
 };
 
 // ============ مكون المهام ============
-const TasksList = () => {
+const TasksList = ({ refreshTrigger }: { refreshTrigger: number }) => {
   const [tasks, setTasks] = useState<any[]>([]);
   const [newTask, setNewTask] = useState('');
 
+  // تحميل المهام عند التحديث
   useEffect(() => {
     const saved = localStorage.getItem('enjaz_tasks');
     if (saved) {
       setTasks(JSON.parse(saved));
     }
-  }, []);
+  }, [refreshTrigger]);
 
   const saveTasks = (updatedTasks: any[]) => {
     setTasks(updatedTasks);
@@ -227,26 +221,31 @@ export default function Home() {
     focusScore: 0,
     level: 'ضعيف'
   });
+  const [taskRefresh, setTaskRefresh] = useState(0);
 
-  // تحميل البيانات المحفوظة
+  // تحميل البيانات عند بدء التشغيل
   useEffect(() => {
     const saved = localStorage.getItem('enjaz_sessions');
     if (saved) {
       const loaded = JSON.parse(saved);
       setSessions(loaded);
-      setStats(calculateFocusScore(loaded));
+      setStats(calculateStats(loaded));
     }
   }, []);
 
-  // تحديث الإحصائيات وحفظها
-  const updateStatsAndSave = (updatedSessions: StudySession[]) => {
-    setSessions(updatedSessions);
-    setStats(calculateFocusScore(updatedSessions));
-    localStorage.setItem('enjaz_sessions', JSON.stringify(updatedSessions));
-  };
+  // دالة حفظ وتحديث الإحصائيات
+  const updateSessions = useCallback((newSessions: StudySession[]) => {
+    setSessions(newSessions);
+    const newStats = calculateStats(newSessions);
+    setStats(newStats);
+    localStorage.setItem('enjaz_sessions', JSON.stringify(newSessions));
+    
+    // عرض إشعار بالجلسة المسجلة
+    console.log('تم تحديث الإحصائيات:', newStats);
+  }, []);
 
-  // إنهاء جلسة دراسة
-  const handleSessionEnd = (durationMinutes: number, distractions: number) => {
+  // إنهاء جلسة الدراسة
+  const handleSessionComplete = (durationMinutes: number, distractions: number) => {
     const newSession: StudySession = {
       id: Date.now().toString(),
       startTime: new Date(),
@@ -255,24 +254,31 @@ export default function Home() {
       distractions
     };
     
-    const updated = [newSession, ...sessions];
-    updateStatsAndSave(updated);
+    const updatedSessions = [newSession, ...sessions];
+    updateSessions(updatedSessions);
     
     // رسالة تأكيد
-    alert(`✅ تم تسجيل جلسة: ${durationMinutes} دقيقة، ${distractions} تشتت`);
+    alert(`✅ تم تسجيل جلسة:\n📚 المدة: ${durationMinutes} دقيقة\n🔔 التشتتات: ${distractions}`);
   };
 
-  // تسجيل تشتت (هذه تضاف للجلسة الحالية عبر المؤقت)
-  // لكن نحتاج متغير لحساب التشتتات الكلية
-  const handleDistractionRecord = () => {
-    // هذه الدالة فقط لتحديث واجهة المستخدم عند الضغط على تشتت
-    // التشتتات تسجل داخل الجلسة عند إنهائها
-    console.log('تم تسجيل تشتت');
+  // مسح جميع البيانات
+  const clearAllData = () => {
+    if (confirm('⚠️ هل أنت متأكد من مسح جميع جلسات الدراسة؟')) {
+      updateSessions([]);
+      alert('🗑 تم مسح جميع البيانات');
+    }
   };
 
-  // نصيحة ذكية حسب الأداء
+  // تحديث المهام
+  const refreshTasks = () => {
+    setTaskRefresh(prev => prev + 1);
+  };
+
+  // نصيحة ذكية
   const getTip = () => {
-    if (stats.focusScore < 35) {
+    if (stats.sessionsCount === 0) {
+      return "🌱 ابدأ أول جلسة دراسة اليوم";
+    } else if (stats.focusScore < 35) {
       return "🌿 جرب جلسات قصيرة 15 دقيقة مع استراحة 5 دقائق";
     } else if (stats.focusScore < 65) {
       return "🍃 ممتاز! جرب تقنية 25 دقيقة دراسة / 5 دقائق راحة";
@@ -292,7 +298,7 @@ export default function Home() {
           <p className="text-[#8B9E6E]">مدرب الدراسة الذكي - جودة وليس كمية</p>
         </div>
 
-        {/* Stats Cards - تتحدث الآن بشكل فوري */}
+        {/* Stats Cards - تتحدث الآن فوراً */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           <div className="bg-white/60 backdrop-blur-md rounded-2xl border border-[#8B9E6E]/20 shadow-xl p-4 text-center hover:bg-white/70 transition-all">
             <div className="text-3xl font-bold text-[#5C4B3A]">{stats.sessionsCount}</div>
@@ -315,10 +321,7 @@ export default function Home() {
         {/* Main Grid */}
         <div className="grid lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
-            <StudyTimer 
-              onSessionEnd={handleSessionEnd}
-              onDistractionRecord={handleDistractionRecord}
-            />
+            <StudyTimer onSessionComplete={handleSessionComplete} />
             
             {/* النصيحة الذكية */}
             <div className="bg-gradient-to-r from-[#8B9E6E]/10 to-[#A8B89A]/10 backdrop-blur-md rounded-3xl border border-[#8B9E6E]/20 shadow-xl p-6">
@@ -340,7 +343,7 @@ export default function Home() {
                         <span className="text-[#C4A27A]">{session.distractions} تشتت</span>
                       </div>
                       <div className="text-sm text-[#8B9E6E]">
-                        {new Date(session.startTime).toLocaleDateString('ar-SA')} - {new Date(session.startTime).toLocaleTimeString('ar-SA')}
+                        {new Date(session.startTime).toLocaleTimeString('ar-SA')}
                       </div>
                     </div>
                   ))}
@@ -350,7 +353,7 @@ export default function Home() {
           </div>
 
           <div className="space-y-6">
-            {/* مؤشر التركيز المتقدم */}
+            {/* مؤشر التركيز */}
             <div className="bg-white/60 backdrop-blur-md rounded-3xl border border-[#8B9E6E]/20 shadow-xl p-6">
               <h3 className="text-xl font-bold mb-4 text-center text-[#5C4B3A]">📈 تحليل التركيز</h3>
               <div className="text-center mb-4">
@@ -374,23 +377,16 @@ export default function Home() {
               </div>
             </div>
             
-            <TasksList />
+            <TasksList refreshTrigger={taskRefresh} />
+            
+            {/* زر مسح البيانات */}
+            <button 
+              onClick={clearAllData}
+              className="w-full px-4 py-2 rounded-xl text-sm text-[#8B9E6E]/60 hover:text-[#C4A27A] transition-all bg-white/30 backdrop-blur-sm border border-[#8B9E6E]/20"
+            >
+              🗑 مسح جميع البيانات
+            </button>
           </div>
-        </div>
-
-        {/* زر مسح البيانات (للاختبار) */}
-        <div className="text-center mt-8">
-          <button 
-            onClick={() => {
-              if (confirm('هل تريد مسح جميع جلسات الدراسة؟')) {
-                updateStatsAndSave([]);
-                alert('تم مسح جميع البيانات');
-              }
-            }}
-            className="text-sm text-[#8B9E6E]/60 hover:text-[#C4A27A] transition-all"
-          >
-            🗑 مسح جميع البيانات
-          </button>
         </div>
       </div>
     </div>
