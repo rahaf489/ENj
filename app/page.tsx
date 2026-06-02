@@ -59,29 +59,32 @@ export default function Home() {
   };
 
   const endSession = () => {
-    if (seconds >= 60) {
-      const newSession = {
-        id: Date.now().toString(),
-        startTime: new Date().toISOString(),
-        durationMinutes: Math.floor(seconds / 60),
-        distractions: currentDistractions
-      };
-      
-      const updated = [newSession, ...sessions];
-      setSessions(updated);
-      localStorage.setItem('enjaz_sessions', JSON.stringify(updated));
-      
-      // إعادة تعيين
-      setIsActive(false);
-      setSeconds(0);
-      setCurrentDistractions(0);
-      
-      alert(`✅ تم تسجيل جلسة: ${newSession.durationMinutes} دقيقة، ${newSession.distractions} تشتت`);
-    } else if (seconds > 0) {
-      alert('⚠️ الرجاء الدراسة لمدة دقيقة على الأقل');
-      setIsActive(false);
-      setSeconds(0);
-      setCurrentDistractions(0);
+    // ✅ تمت إزالة الشرط (seconds >= 60)
+    // احتساب الدقائق (حتى لو كانت أقل من دقيقة، سيتم تقريبها لأقرب دقيقة أو اعتبارها 0 إذا كانت أقل من 30 ثانية؟ سنحتفظ بالمعادلة القديمة)
+    // لكن لنجعلها أكثر دقة: عدد الدقائق = Math.floor(seconds / 60)
+    const durationMinutes = Math.floor(seconds / 60);
+    
+    const newSession = {
+      id: Date.now().toString(),
+      startTime: new Date().toISOString(),
+      durationMinutes: durationMinutes,
+      distractions: currentDistractions
+    };
+    
+    const updated = [newSession, ...sessions];
+    setSessions(updated);
+    localStorage.setItem('enjaz_sessions', JSON.stringify(updated));
+    
+    // إعادة تعيين
+    setIsActive(false);
+    setSeconds(0);
+    setCurrentDistractions(0);
+    
+    // عرض رسالة تأكيد
+    if (durationMinutes > 0 || currentDistractions > 0) {
+        alert(`✅ تم تسجيل جلسة: ${durationMinutes} دقيقة، ${currentDistractions} تشتت`);
+    } else {
+        alert(`⏱️ تم تسجيل جلسة قصيرة جداً`);
     }
   };
 
@@ -114,7 +117,7 @@ export default function Home() {
           <p className="text-[#8B9E6E]">مدرب الدراسة الذكي - جودة وليس كمية</p>
         </div>
 
-        {/* البطاقات - تتحدث فوراً */}
+        {/* البطاقات */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           <div className="bg-white/60 backdrop-blur-md rounded-2xl border border-[#8B9E6E]/20 shadow-xl p-4 text-center">
             <div className="text-3xl font-bold text-[#5C4B3A]">{sessionsCount}</div>
