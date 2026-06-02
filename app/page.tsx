@@ -3,12 +3,42 @@
 
 import { useState, useEffect } from 'react';
 
+// ============ أنواع البيانات ============
+interface DistractionLog {
+  id: string;
+  timeFromStart: number; // بالثواني
+  reason: string;
+}
+
+interface StudySession {
+  id: string;
+  startTime: string;
+  durationMinutes: number;
+  distractions: DistractionLog[];
+}
+
 // ============ الصفحة الرئيسية ============
 export default function Home() {
-  const [sessions, setSessions] = useState<any[]>([]);
-  const [currentDistractions, setCurrentDistractions] = useState(0);
+  const [sessions, setSessions] = useState<StudySession[]>([]);
   const [isActive, setIsActive] = useState(false);
   const [seconds, setSeconds] = useState(0);
+  const [currentDistractions, setCurrentDistractions] = useState<DistractionLog[]>([]);
+  const [showReasonModal, setShowReasonModal] = useState(false);
+  const [selectedReason, setSelectedReason] = useState('');
+
+  // أسباب التشتت
+  const distractionReasons = [
+    '📱 جوال / وسائل تواصل',
+    '💭 شرود ذهني / أحلام يقظة',
+    '🔊 ضوضاء خارجية',
+    '😴 تعب / نعاس',
+    '🍽 جوع / عطش',
+    '📺 مشاهدة فيديو / يوتيوب',
+    '💬 حديث مع شخص',
+    '🌐 تصفح إنترنت',
+    '🎮 ألعاب',
+    '✏️ أسباب أخرى'
+  ];
 
   // المؤقت
   useEffect(() => {
@@ -31,8 +61,7 @@ export default function Home() {
 
   // حساب الإحصائيات
   const totalMinutes = sessions.reduce((sum, s) => sum + s.durationMinutes, 0);
-  const savedDistractions = sessions.reduce((sum, s) => sum + s.distractions, 0);
-  const totalDistractions = savedDistractions + (isActive ? currentDistractions : 0);
+  const totalDistractions = sessions.reduce((sum, s) => sum + s.distractions.length, 0);
   const sessionsCount = sessions.length;
   
   let focusScore = (sessionsCount * 10) - (totalDistractions * 5) + Math.floor(totalMinutes / 5);
@@ -45,7 +74,7 @@ export default function Home() {
   // دوال التحكم
   const startStudy = () => {
     setIsActive(true);
-    setCurrentDistractions(0);
+    setCurrentDistractions([]);
   };
 
   const pauseStudy = () => {
@@ -54,17 +83,27 @@ export default function Home() {
 
   const addDistraction = () => {
     if (isActive) {
-      setCurrentDistractions((prev) => prev + 1);
+      setShowReasonModal(true);
+    }
+  };
+
+  const confirmDistraction = () => {
+    if (selectedReason) {
+      const newDistraction: DistractionLog = {
+        id: Date.now().toString(),
+        timeFromStart: seconds,
+        reason: selectedReason
+      };
+      setCurrentDistractions([...currentDistractions, newDistraction]);
+      setSelectedReason('');
+      setShowReasonModal(false);
     }
   };
 
   const endSession = () => {
-    // ✅ تمت إزالة الشرط (seconds >= 60)
-    // احتساب الدقائق (حتى لو كانت أقل من دقيقة، سيتم تقريبها لأقرب دقيقة أو اعتبارها 0 إذا كانت أقل من 30 ثانية؟ سنحتفظ بالمعادلة القديمة)
-    // لكن لنجعلها أكثر دقة: عدد الدقائق = Math.floor(seconds / 60)
     const durationMinutes = Math.floor(seconds / 60);
     
-    const newSession = {
+    const newSession: StudySession = {
       id: Date.now().toString(),
       startTime: new Date().toISOString(),
       durationMinutes: durationMinutes,
@@ -78,20 +117,20 @@ export default function Home() {
     // إعادة تعيين
     setIsActive(false);
     setSeconds(0);
-    setCurrentDistractions(0);
-    
-    // عرض رسالة تأكيد
-    if (durationMinutes > 0 || currentDistractions > 0) {
-        alert(`✅ تم تسجيل جلسة: ${durationMinutes} دقيقة، ${currentDistractions} تشتت`);
-    } else {
-        alert(`⏱️ تم تسجيل جلسة قصيرة جداً`);
-    }
+    setCurrentDistractions([]);
   };
 
   const formatTime = (totalSeconds: number) => {
     const mins = Math.floor(totalSeconds / 60);
     const secs = totalSeconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const formatTimeFromSeconds = (totalSeconds: number) => {
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    if (mins === 0) return `${secs} ثانية`;
+    return `${mins} دقيقة و ${secs} ثانية`;
   };
 
   const getTip = () => {
@@ -130,9 +169,9 @@ export default function Home() {
           <div className="bg-white/60 backdrop-blur-md rounded-2xl border border-[#8B9E6E]/20 shadow-xl p-4 text-center relative">
             <div className="text-3xl font-bold text-[#C4A27A]">{totalDistractions}</div>
             <div className="text-sm text-[#8B9E6E] mt-1">🔔 مرات تشتت</div>
-            {isActive && currentDistractions > 0 && (
+            {isActive && currentDistractions.length > 0 && (
               <div className="absolute -top-2 -right-2 bg-orange-500 text-white text-xs rounded-full px-2 py-0.5 animate-pulse">
-                +{currentDistractions}
+                +{currentDistractions.length}
               </div>
             )}
           </div>
@@ -181,7 +220,7 @@ export default function Home() {
                   onClick={addDistraction}
                   className="w-full px-6 py-3 rounded-2xl font-medium bg-orange-500/20 hover:bg-orange-500/30 text-orange-700 border border-orange-500/30 transition-all"
                 >
-                  🔔 تسجيل تشتت (تم تسجيل {currentDistractions})
+                  🔔 تسجيل تشتت (تم تسجيل {currentDistractions.length})
                 </button>
               )}
             </div>
@@ -191,15 +230,38 @@ export default function Home() {
               <p className="text-[#5C4B3A] text-lg">💡 {getTip()}</p>
             </div>
 
-            {/* تاريخ الجلسات */}
+            {/* تاريخ الجلسات مع تفاصيل التشتت */}
             {sessions.length > 0 && (
               <div className="bg-white/60 rounded-3xl border border-[#8B9E6E]/20 shadow-xl p-6">
-                <h3 className="text-xl font-bold mb-4 text-[#5C4B3A]">📊 آخر الجلسات</h3>
-                <div className="space-y-2">
-                  {sessions.slice(0, 5).map((session: any) => (
-                    <div key={session.id} className="flex justify-between items-center p-3 rounded-xl bg-white/40">
-                      <span className="font-mono text-[#5C4B3A]">{session.durationMinutes} دقيقة • {session.distractions} تشتت</span>
-                      <span className="text-sm text-[#8B9E6E]">{new Date(session.startTime).toLocaleTimeString('ar-SA')}</span>
+                <h3 className="text-xl font-bold mb-4 text-[#5C4B3A]">📊 تاريخ الجلسات</h3>
+                <div className="space-y-4 max-h-96 overflow-y-auto">
+                  {sessions.map((session: StudySession) => (
+                    <div key={session.id} className="border-b border-[#8B9E6E]/20 last:border-0 pb-4">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="font-bold text-[#5C4B3A]">
+                          🕐 {new Date(session.startTime).toLocaleTimeString('ar-SA')}
+                        </span>
+                        <span className="text-sm text-[#8B9E6E]">
+                          {session.durationMinutes} دقيقة • {session.distractions.length} تشتت
+                        </span>
+                      </div>
+                      
+                      {/* تفاصيل التشتتات */}
+                      {session.distractions.length > 0 && (
+                        <div className="mt-2 mr-4">
+                          <p className="text-sm font-semibold text-[#C4A27A] mb-1">📝 تفاصيل التشتت:</p>
+                          <div className="space-y-1">
+                            {session.distractions.map((dist, idx) => (
+                              <div key={dist.id} className="text-sm text-[#8B9E6E] flex items-center gap-2">
+                                <span className="text-xs">#{idx + 1}</span>
+                                <span className="font-mono">⏱ {formatTimeFromSeconds(dist.timeFromStart)}</span>
+                                <span>→</span>
+                                <span>{dist.reason}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -238,6 +300,48 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      {/* نافذة اختيار سبب التشتت */}
+      {showReasonModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6">
+            <h3 className="text-xl font-bold mb-4 text-[#5C4B3A">🤔 ما سبب التشتت؟</h3>
+            <div className="space-y-2 max-h-96 overflow-y-auto mb-6">
+              {distractionReasons.map((reason) => (
+                <button
+                  key={reason}
+                  onClick={() => setSelectedReason(reason)}
+                  className={`w-full text-right px-4 py-3 rounded-xl transition-all ${
+                    selectedReason === reason
+                      ? 'bg-[#8B9E6E] text-white'
+                      : 'bg-gray-100 hover:bg-gray-200 text-[#5C4B3A]'
+                  }`}
+                >
+                  {reason}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowReasonModal(false);
+                  setSelectedReason('');
+                }}
+                className="flex-1 px-4 py-2 rounded-xl bg-gray-200 hover:bg-gray-300 text-[#5C4B3A] transition-all"
+              >
+                إلغاء
+              </button>
+              <button
+                onClick={confirmDistraction}
+                disabled={!selectedReason}
+                className="flex-1 px-4 py-2 rounded-xl bg-[#8B9E6E] hover:bg-[#7A8D5E] text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              >
+                تأكيد
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
