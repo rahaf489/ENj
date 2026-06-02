@@ -4,7 +4,13 @@
 import { useState, useEffect } from 'react';
 
 // ============ مكون المؤقت ============
-const StudyTimer = ({ onAddSession }: { onAddSession: (duration: number, distractions: number) => void }) => {
+const StudyTimer = ({ 
+  onAddSession, 
+  onLiveDistraction 
+}: { 
+  onAddSession: (duration: number, distractions: number) => void;
+  onLiveDistraction: () => void;
+}) => {
   const [isActive, setIsActive] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [distractions, setDistractions] = useState(0);
@@ -28,6 +34,7 @@ const StudyTimer = ({ onAddSession }: { onAddSession: (duration: number, distrac
   const handleDistraction = () => {
     if (isActive) {
       setDistractions((d: number) => d + 1);
+      onLiveDistraction(); // تحديث فوري للبطاقة العلوية
     }
   };
 
@@ -147,11 +154,15 @@ const TasksList = () => {
 // ============ الصفحة الرئيسية ============
 export default function Home() {
   const [sessions, setSessions] = useState<any[]>([]);
-  
-  // حساب الإحصائيات من الجلسات مباشرة
+  const [liveDistractions, setLiveDistractions] = useState(0); // التشتتات الحية في الجلسة الحالية
+  const [isSessionActive, setIsSessionActive] = useState(false);
+
+  // حساب الإحصائيات من الجلسات + التشتتات الحية
   const totalMinutes = sessions.reduce((sum, s) => sum + s.durationMinutes, 0);
-  const totalDistractions = sessions.reduce((sum, s) => sum + s.distractions, 0);
+  const savedDistractions = sessions.reduce((sum, s) => sum + s.distractions, 0);
+  const totalDistractions = savedDistractions + (isSessionActive ? liveDistractions : 0);
   const sessionsCount = sessions.length;
+  
   let focusScore = (sessionsCount * 10) - (totalDistractions * 5) + Math.floor(totalMinutes / 5);
   focusScore = Math.max(0, Math.min(100, focusScore));
   
@@ -167,7 +178,20 @@ export default function Home() {
     }
   }, []);
 
-  // إضافة جلسة جديدة
+  // بدء جلسة جديدة
+  const startSession = () => {
+    setIsSessionActive(true);
+    setLiveDistractions(0);
+  };
+
+  // تسجيل تشتت فوري
+  const recordDistraction = () => {
+    if (isSessionActive) {
+      setLiveDistractions(prev => prev + 1);
+    }
+  };
+
+  // إضافة جلسة كاملة
   const addSession = (durationMinutes: number, distractions: number) => {
     const newSession = {
       id: Date.now().toString(),
@@ -179,6 +203,8 @@ export default function Home() {
     const updatedSessions = [newSession, ...sessions];
     setSessions(updatedSessions);
     localStorage.setItem('enjaz_sessions', JSON.stringify(updatedSessions));
+    setIsSessionActive(false);
+    setLiveDistractions(0);
     
     alert(`✅ تم تسجيل جلسة: ${durationMinutes} دقيقة، ${distractions} تشتت`);
   };
@@ -188,12 +214,14 @@ export default function Home() {
     if (confirm('مسح جميع الجلسات؟')) {
       setSessions([]);
       localStorage.setItem('enjaz_sessions', JSON.stringify([]));
+      setIsSessionActive(false);
+      setLiveDistractions(0);
     }
   };
 
   // نصيحة ذكية
   const getTip = () => {
-    if (sessionsCount === 0) return "🌱 ابدأ أول جلسة دراسة اليوم";
+    if (sessionsCount === 0 && !isSessionActive) return "🌱 ابدأ أول جلسة دراسة اليوم";
     if (focusScore < 35) return "🌿 جرب جلسات قصيرة 15 دقيقة";
     if (focusScore < 65) return "🍃 ممتاز! جرب تقنية 25/5 دقائق";
     return "🌱 رائع! أنت في حالة تركيز مثالية";
@@ -208,7 +236,7 @@ export default function Home() {
           <p className="text-[#8B9E6E]">مدرب الدراسة الذكي - جودة وليس كمية</p>
         </div>
 
-        {/* Stats Cards - تتحدث مباشرة من sessions */}
+        {/* Stats Cards - تتحدث فوراً عند الضغط على تشتت */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           <div className="bg-white/60 backdrop-blur-md rounded-2xl border border-[#8B9E6E]/20 shadow-xl p-4 text-center">
             <div className="text-3xl font-bold text-[#5C4B3A]">{sessionsCount}</div>
@@ -221,6 +249,9 @@ export default function Home() {
           <div className="bg-white/60 backdrop-blur-md rounded-2xl border border-[#8B9E6E]/20 shadow-xl p-4 text-center">
             <div className="text-3xl font-bold text-[#C4A27A]">{totalDistractions}</div>
             <div className="text-sm text-[#8B9E6E] mt-1">🔔 مرات تشتت</div>
+            {isSessionActive && liveDistractions > 0 && (
+              <div className="text-xs text-orange-500 mt-1 animate-pulse">+{liveDistractions} جديد</div>
+            )}
           </div>
           <div className="bg-white/60 backdrop-blur-md rounded-2xl border border-[#8B9E6E]/20 shadow-xl p-4 text-center">
             <div className="text-3xl font-bold text-[#8B9E6E]">{focusScore}%</div>
@@ -231,7 +262,10 @@ export default function Home() {
         {/* Main Grid */}
         <div className="grid lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
-            <StudyTimer onAddSession={addSession} />
+            <StudyTimer 
+              onAddSession={addSession}
+              onLiveDistraction={recordDistraction}
+            />
             
             <div className="bg-gradient-to-r from-[#8B9E6E]/10 to-[#A8B89A]/10 rounded-3xl p-6 text-center">
               <p className="text-[#5C4B3A] text-lg">💡 {getTip()}</p>
@@ -258,8 +292,13 @@ export default function Home() {
               <div className="text-6xl font-bold text-[#8B9E6E]">{focusScore}%</div>
               <div className="text-sm text-[#8B9E6E] mt-2">مستوى {level}</div>
               <div className="w-full bg-[#E8DFD0] rounded-full h-3 mt-4">
-                <div className="bg-[#8B9E6E] rounded-full h-3 transition-all" style={{ width: `${focusScore}%` }} />
+                <div className="bg-gradient-to-r from-[#8B9E6E] to-[#A8B89A] rounded-full h-3 transition-all duration-300" style={{ width: `${focusScore}%` }} />
               </div>
+              {isSessionActive && (
+                <div className="mt-3 text-xs text-[#8B9E6E] animate-pulse">
+                  🔴 جلسة نشطة...
+                </div>
+              )}
             </div>
             
             <TasksList />
