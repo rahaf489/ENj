@@ -1,7 +1,7 @@
 // app/page.tsx
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 
 // ============ أنواع البيانات ============
 interface DistractionLog {
@@ -17,166 +17,66 @@ interface StudySession {
   distractions: DistractionLog[];
 }
 
-// ============ مكون Flip Clock الرقمي ============
-const FlipDigit = ({ digit, nextDigit, isFlipping }: { digit: string; nextDigit: string; isFlipping: boolean }) => {
-  return (
-    <div className="relative inline-block w-20 h-28 mx-1 perspective-1000">
-      <div className={`absolute top-0 left-0 w-full h-1/2 bg-[#1a1a2e] rounded-t-lg overflow-hidden shadow-lg border-b border-[#0f0f1a] ${isFlipping ? 'animate-flip-top' : ''}`}>
-        <div className="absolute bottom-0 left-0 w-full text-center text-6xl font-mono font-bold text-[#8B9E6E] leading-[56px]">
-          {digit}
+// ============ مكون Flip Clock - الساعة المتقلبة ============
+const FlipClock = ({ minutes, seconds }: { minutes: number; seconds: number }) => {
+  // تحويل الأرقام إلى خانات فردية
+  const minTens = Math.floor(minutes / 10);
+  const minOnes = minutes % 10;
+  const secTens = Math.floor(seconds / 10);
+  const secOnes = seconds % 10;
+
+  const FlipCard = ({ digit, nextDigit }: { digit: number; nextDigit: number }) => {
+    const [isFlipping, setIsFlipping] = useState(false);
+    const [currentDigit, setCurrentDigit] = useState(digit);
+    const [futureDigit, setFutureDigit] = useState(nextDigit);
+
+    useEffect(() => {
+      if (digit !== currentDigit) {
+        setIsFlipping(true);
+        setFutureDigit(digit);
+        
+        const timer = setTimeout(() => {
+          setCurrentDigit(digit);
+          setIsFlipping(false);
+        }, 300);
+        
+        return () => clearTimeout(timer);
+      }
+    }, [digit]);
+
+    return (
+      <div className="relative w-20 h-28 mx-1 perspective-1000">
+        {/* النصف العلوي */}
+        <div className={`absolute top-0 left-0 w-full h-1/2 bg-[#1a1a2e] rounded-t-lg overflow-hidden shadow-lg border-b border-[#0f0f1a] ${isFlipping ? 'animate-flip-top' : ''}`}>
+          <div className="absolute bottom-0 left-0 w-full text-center text-6xl font-mono font-bold text-[#8B9E6E] leading-[56px]">
+            {currentDigit}
+          </div>
         </div>
-      </div>
-      
-      <div className={`absolute bottom-0 left-0 w-full h-1/2 bg-[#1a1a2e] rounded-b-lg overflow-hidden shadow-lg ${isFlipping ? 'animate-flip-bottom' : ''}`}>
-        <div className="absolute top-0 left-0 w-full text-center text-6xl font-mono font-bold text-[#8B9E6E] leading-[56px]">
-          {nextDigit}
+        
+        {/* النصف السفلي */}
+        <div className={`absolute bottom-0 left-0 w-full h-1/2 bg-[#1a1a2e] rounded-b-lg overflow-hidden shadow-lg ${isFlipping ? 'animate-flip-bottom' : ''}`}>
+          <div className="absolute top-0 left-0 w-full text-center text-6xl font-mono font-bold text-[#8B9E6E] leading-[56px]">
+            {isFlipping ? futureDigit : currentDigit}
+          </div>
         </div>
+        
+        {/* خط فاصل */}
+        <div className="absolute top-1/2 left-0 w-full h-0.5 bg-[#0f0f1a] z-10"></div>
+        
+        {/* تأثير لمعان */}
+        <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent rounded-lg pointer-events-none"></div>
       </div>
-      
-      <div className="absolute top-1/2 left-0 w-full h-0.5 bg-[#0f0f1a] z-10"></div>
-      <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent rounded-lg pointer-events-none"></div>
-    </div>
-  );
-};
-
-const FlipClock = ({ time }: { time: string }) => {
-  const [prevTime, setPrevTime] = useState(time);
-  const [flippingDigits, setFlippingDigits] = useState<boolean[]>(new Array(5).fill(false));
-  
-  useEffect(() => {
-    const changes = time.split('').map((digit, i) => digit !== prevTime[i]);
-    setFlippingDigits(changes);
-    
-    const timer = setTimeout(() => {
-      setFlippingDigits(new Array(5).fill(false));
-      setPrevTime(time);
-    }, 300);
-    
-    return () => clearTimeout(timer);
-  }, [time]);
-  
-  const digits = time.split('');
-  const prevDigits = prevTime.split('');
-  
-  return (
-    <div className="flex justify-center items-center gap-1">
-      {digits.map((digit, i) => (
-        <FlipDigit
-          key={i}
-          digit={prevDigits[i] || '0'}
-          nextDigit={digit}
-          isFlipping={flippingDigits[i]}
-        />
-      ))}
-    </div>
-  );
-};
-
-// ============ مكون تشغيل الصوت من يوتيوب ============
-const YouTubeAudioPlayer = ({ videoUrl, isActive, onPlay, onPause }: { 
-  videoUrl: string; 
-  isActive: boolean;
-  onPlay: () => void;
-  onPause: () => void;
-}) => {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-  const [playerReady, setPlayerReady] = useState(false);
-
-  // استخراج ID الفيديو من رابط يوتيوب
-  const getYouTubeId = (url: string) => {
-    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-    const match = url.match(regExp);
-    return (match && match[2].length === 11) ? match[2] : null;
+    );
   };
 
-  const videoId = getYouTubeId(videoUrl);
-  const embedUrl = videoId ? `https://www.youtube.com/embed/${videoId}?autoplay=0&controls=0&enablejsapi=1` : '';
-
-  // تحميل API اليوتيوب
-  useEffect(() => {
-    if (!videoId) return;
-
-    // إضافة script الـ API إذا لم يكن موجوداً
-    if (!document.querySelector('#youtube-api')) {
-      const tag = document.createElement('script');
-      tag.id = 'youtube-api';
-      tag.src = 'https://www.youtube.com/iframe_api';
-      const firstScriptTag = document.getElementsByTagName('script')[0];
-      firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
-    }
-
-    // انتظار تحميل API
-    (window as any).onYouTubeIframeAPIReady = () => {
-      if (iframeRef.current) {
-        new (window as any).YT.Player(iframeRef.current, {
-          events: {
-            onReady: () => setPlayerReady(true)
-          }
-        });
-      }
-    };
-  }, [videoId]);
-
-  // التحكم في التشغيل عند بدء/إيقاف الجلسة
-  useEffect(() => {
-    if (playerReady && iframeRef.current) {
-      const iframe = iframeRef.current;
-      if (isActive && !isPlaying) {
-        // تشغيل الفيديو
-        iframe.contentWindow?.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
-        setIsPlaying(true);
-        onPlay();
-      } else if (!isActive && isPlaying) {
-        // إيقاف الفيديو
-        iframe.contentWindow?.postMessage('{"event":"command","func":"pauseVideo","args":""}', '*');
-        setIsPlaying(false);
-        onPause();
-      }
-    }
-  }, [isActive, playerReady]);
-
-  const togglePlay = () => {
-    if (iframeRef.current) {
-      if (isPlaying) {
-        iframeRef.current.contentWindow?.postMessage('{"event":"command","func":"pauseVideo","args":""}', '*');
-        setIsPlaying(false);
-        onPause();
-      } else {
-        iframeRef.current.contentWindow?.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
-        setIsPlaying(true);
-        onPlay();
-      }
-    }
-  };
-
-  if (!videoId) return null;
-
   return (
-    <div className="mt-3">
-      <iframe
-        ref={iframeRef}
-        src={embedUrl}
-        className="hidden"
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-      />
-      <div className="flex items-center justify-between p-3 rounded-xl bg-[#8B9E6E]/10 border border-[#8B9E6E]/20">
-        <span className="text-sm text-[#5C4B3A] truncate flex-1">
-          🎵 يوتيوب: {videoUrl.length > 40 ? videoUrl.substring(0, 40) + '...' : videoUrl}
-        </span>
-        <div className="flex gap-2">
-          {isPlaying ? (
-            <span className="text-xs text-[#8B9E6E] animate-pulse">🔊 يعمل</span>
-          ) : (
-            <span className="text-xs text-[#8B9E6E]/60">⏸ متوقف</span>
-          )}
-          <button
-            onClick={togglePlay}
-            className="text-xs text-[#8B9E6E] hover:text-[#7A8D5E]"
-          >
-            {isPlaying ? '⏸ إيقاف' : '▶ تشغيل'}
-          </button>
-        </div>
+    <div className="bg-gradient-to-br from-[#2d2d44] to-[#1a1a2e] rounded-3xl shadow-2xl p-12">
+      <div className="flex justify-center items-center gap-2">
+        <FlipCard digit={minTens} nextDigit={minTens} />
+        <FlipCard digit={minOnes} nextDigit={minOnes} />
+        <span className="text-6xl font-bold text-[#8B9E6E] mx-2">:</span>
+        <FlipCard digit={secTens} nextDigit={secTens} />
+        <FlipCard digit={secOnes} nextDigit={secOnes} />
       </div>
     </div>
   );
@@ -190,10 +90,6 @@ export default function Home() {
   const [currentDistractions, setCurrentDistractions] = useState<DistractionLog[]>([]);
   const [showReasonModal, setShowReasonModal] = useState(false);
   const [selectedReason, setSelectedReason] = useState('');
-  const [audioUrl, setAudioUrl] = useState('');
-  const [isAudioPlaying, setIsAudioPlaying] = useState(false);
-  const [youtubeUrl, setYoutubeUrl] = useState('');
-  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // أسباب التشتت
   const distractionReasons = [
@@ -202,27 +98,10 @@ export default function Home() {
     '🔊 ضوضاء خارجية',
     '😴 تعب / نعاس',
     '🍽 جوع / عطش',
-    '📺 مشاهدة فيديو / يوتيوب',
     '💬 حديث مع شخص',
     '🌐 تصفح إنترنت',
     '🎮 ألعاب',
     '✏️ أسباب أخرى'
-  ];
-
-  // أمثلة لروابط صوتية MP3
-  const audioSuggestions = [
-    { name: '🌧 مطر هادئ', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3' },
-    { name: '🌊 أمواج البحر', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3' },
-    { name: '🔥 نار المدفأة', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3' },
-    { name: '🎹 بيانو هادئ', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3' },
-  ];
-
-  // أمثلة لروابط يوتيوب (موسيقى هادئة للدراسة)
-  const youtubeSuggestions = [
-    { name: '🎹 بيانو هادئ للدراسة', url: 'https://www.youtube.com/watch?v=4xDzrJKXOOY' },
-    { name: '🌙 موسيقى ليلية هادئة', url: 'https://www.youtube.com/watch?v=WPni755-Krg' },
-    { name: '📚 موسيقى تركيز للدراسة', url: 'https://www.youtube.com/watch?v=5qap5aO4i9A' },
-    { name: '🎻 موسيقى كلاسيكية', url: 'https://www.youtube.com/watch?v=4gLYVQjvGak' },
   ];
 
   // المؤقت
@@ -241,8 +120,7 @@ export default function Home() {
     const saved = localStorage.getItem('enjaz_sessions');
     if (saved) {
       try {
-        const parsed = JSON.parse(saved);
-        setSessions(parsed);
+        setSessions(JSON.parse(saved));
       } catch (e) {
         console.error('خطأ في تحميل البيانات', e);
       }
@@ -310,12 +188,6 @@ export default function Home() {
     setCurrentDistractions([]);
   };
 
-  const formatTimeForFlip = (totalSeconds: number) => {
-    const mins = Math.floor(totalSeconds / 60);
-    const secs = totalSeconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
   const formatTimeFromSeconds = (totalSeconds: number) => {
     if (isNaN(totalSeconds)) return '0 ثانية';
     const mins = Math.floor(totalSeconds / 60);
@@ -339,7 +211,8 @@ export default function Home() {
     }
   };
 
-  const currentTime = formatTimeForFlip(seconds);
+  const currentMinutes = Math.floor(seconds / 60);
+  const currentSeconds = seconds % 60;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F5F0E8] via-[#EDE5D8] to-[#F5F0E8] p-6 md:p-8">
@@ -378,154 +251,42 @@ export default function Home() {
         <div className="grid lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
             {/* Flip Clock */}
-            <div className="bg-gradient-to-br from-[#2d2d44] to-[#1a1a2e] rounded-3xl shadow-2xl p-12">
-              <FlipClock time={currentTime} />
-              
-              <div className="flex gap-4 justify-center mt-12 flex-wrap">
-                {!isActive ? (
-                  <button 
-                    onClick={startStudy} 
-                    className="px-8 py-3 rounded-2xl font-medium bg-[#8B9E6E] hover:bg-[#7A8D5E] text-white transition-all shadow-lg"
-                  >
-                    ▶ بدء الدراسة
-                  </button>
-                ) : (
-                  <>
-                    <button 
-                      onClick={pauseStudy} 
-                      className="px-6 py-3 rounded-2xl font-medium bg-[#D4C5B0] hover:bg-[#C9BAA5] text-[#5C4B3A] transition-all"
-                    >
-                      ⏸ إيقاف مؤقت
-                    </button>
-                    <button 
-                      onClick={endSession} 
-                      className="px-6 py-3 rounded-2xl font-medium bg-[#8B9E6E] hover:bg-[#7A8D5E] text-white transition-all shadow-lg"
-                    >
-                      ✅ إنهاء الجلسة
-                    </button>
-                  </>
-                )}
-              </div>
-
-              {isActive && (
-                <button
-                  onClick={addDistraction}
-                  className="w-full mt-4 px-6 py-3 rounded-2xl font-medium bg-orange-500/20 hover:bg-orange-500/30 text-orange-700 border border-orange-500/30 transition-all"
+            <FlipClock minutes={currentMinutes} seconds={currentSeconds} />
+            
+            <div className="flex gap-4 justify-center">
+              {!isActive ? (
+                <button 
+                  onClick={startStudy} 
+                  className="px-8 py-3 rounded-2xl font-medium bg-[#8B9E6E] hover:bg-[#7A8D5E] text-white transition-all shadow-lg"
                 >
-                  🔔 تسجيل تشتت (تم تسجيل {currentDistractions.length})
+                  ▶ بدء الدراسة
                 </button>
+              ) : (
+                <>
+                  <button 
+                    onClick={pauseStudy} 
+                    className="px-6 py-3 rounded-2xl font-medium bg-[#D4C5B0] hover:bg-[#C9BAA5] text-[#5C4B3A] transition-all"
+                  >
+                    ⏸ إيقاف مؤقت
+                  </button>
+                  <button 
+                    onClick={endSession} 
+                    className="px-6 py-3 rounded-2xl font-medium bg-[#8B9E6E] hover:bg-[#7A8D5E] text-white transition-all shadow-lg"
+                  >
+                    ✅ إنهاء الجلسة
+                  </button>
+                </>
               )}
             </div>
 
-            {/* قسم الصوت - MP3 ويوتيوب معاً */}
-            <div className="bg-white/60 backdrop-blur-md rounded-3xl border border-[#8B9E6E]/20 shadow-xl p-6">
-              <h3 className="text-xl font-bold mb-4 text-[#5C4B3A]">🎵 أصوات للتركيز</h3>
-              
-              {/* علامات تبويب بسيطة */}
-              <div className="flex gap-2 mb-4 border-b border-[#8B9E6E]/20">
-                <button className="px-4 py-2 text-[#8B9E6E] border-b-2 border-[#8B9E6E] font-medium">🎧 MP3</button>
-                <button className="px-4 py-2 text-[#8B9E6E]/60 hover:text-[#8B9E6E]">▶️ يوتيوب</button>
-              </div>
-
-              {/* قسم MP3 */}
-              <div>
-                <input
-                  type="text"
-                  value={audioUrl}
-                  onChange={(e) => setAudioUrl(e.target.value)}
-                  placeholder="أدخل رابط صوت (MP3) أو اختر من الأسفل..."
-                  className="w-full mb-4 px-4 py-2 rounded-xl bg-white/60 border border-[#8B9E6E]/30 focus:outline-none focus:border-[#8B9E6E] text-[#5C4B3A] placeholder:text-[#8B9E6E]/50"
-                />
-
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {audioSuggestions.map((audio) => (
-                    <button
-                      key={audio.url}
-                      onClick={() => setAudioUrl(audio.url)}
-                      className="px-3 py-1.5 rounded-xl text-sm bg-[#8B9E6E]/10 hover:bg-[#8B9E6E]/20 text-[#5C4B3A] transition-all border border-[#8B9E6E]/20"
-                    >
-                      {audio.name}
-                    </button>
-                  ))}
-                </div>
-
-                {audioUrl && (
-                  <audio ref={audioRef} src={audioUrl} loop className="hidden" />
-                )}
-
-                {audioUrl && (
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-[#8B9E6E]/10 border border-[#8B9E6E]/20">
-                    <span className="text-sm text-[#5C4B3A] truncate flex-1">
-                      🎵 {audioUrl.length > 40 ? audioUrl.substring(0, 40) + '...' : audioUrl}
-                    </span>
-                    <div className="flex gap-2">
-                      {isAudioPlaying ? (
-                        <span className="text-xs text-[#8B9E6E] animate-pulse">🔊 يعمل</span>
-                      ) : (
-                        <span className="text-xs text-[#8B9E6E]/60">⏸ متوقف</span>
-                      )}
-                      <button
-                        onClick={() => {
-                          if (audioRef.current) {
-                            if (isAudioPlaying) {
-                              audioRef.current.pause();
-                              setIsAudioPlaying(false);
-                            } else {
-                              audioRef.current.play();
-                              setIsAudioPlaying(true);
-                            }
-                          }
-                        }}
-                        className="text-xs text-[#8B9E6E] hover:text-[#7A8D5E]"
-                      >
-                        {isAudioPlaying ? '⏸ إيقاف' : '▶ تشغيل'}
-                      </button>
-                      <button
-                        onClick={() => {
-                          setAudioUrl('');
-                          setIsAudioPlaying(false);
-                        }}
-                        className="text-xs text-red-500 hover:text-red-600"
-                      >
-                        ✖ إزالة
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* قسم يوتيوب */}
-              <div className="mt-6 pt-4 border-t border-[#8B9E6E]/20">
-                <input
-                  type="text"
-                  value={youtubeUrl}
-                  onChange={(e) => setYoutubeUrl(e.target.value)}
-                  placeholder="أدخل رابط يوتيوب (موسيقى هادئة للدراسة)..."
-                  className="w-full mb-4 px-4 py-2 rounded-xl bg-white/60 border border-[#8B9E6E]/30 focus:outline-none focus:border-[#8B9E6E] text-[#5C4B3A] placeholder:text-[#8B9E6E]/50"
-                />
-
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {youtubeSuggestions.map((video) => (
-                    <button
-                      key={video.url}
-                      onClick={() => setYoutubeUrl(video.url)}
-                      className="px-3 py-1.5 rounded-xl text-sm bg-[#8B9E6E]/10 hover:bg-[#8B9E6E]/20 text-[#5C4B3A] transition-all border border-[#8B9E6E]/20"
-                    >
-                      {video.name}
-                    </button>
-                  ))}
-                </div>
-
-                {youtubeUrl && (
-                  <YouTubeAudioPlayer 
-                    videoUrl={youtubeUrl}
-                    isActive={isActive}
-                    onPlay={() => console.log('يوتيوب يعمل')}
-                    onPause={() => console.log('يوتيوب متوقف')}
-                  />
-                )}
-              </div>
-            </div>
+            {isActive && (
+              <button
+                onClick={addDistraction}
+                className="w-full px-6 py-3 rounded-2xl font-medium bg-orange-500/20 hover:bg-orange-500/30 text-orange-700 border border-orange-500/30 transition-all"
+              >
+                🔔 تسجيل تشتت (تم تسجيل {currentDistractions.length})
+              </button>
+            )}
 
             {/* النصيحة */}
             <div className="bg-gradient-to-r from-[#8B9E6E]/10 to-[#A8B89A]/10 rounded-3xl p-6 text-center">
