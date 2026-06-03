@@ -1,12 +1,12 @@
 // app/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 // ============ أنواع البيانات ============
 interface DistractionLog {
   id: string;
-  timeFromStart: number; // بالثواني من بداية الجلسة
+  timeFromStart: number;
   reason: string;
 }
 
@@ -25,6 +25,9 @@ export default function Home() {
   const [currentDistractions, setCurrentDistractions] = useState<DistractionLog[]>([]);
   const [showReasonModal, setShowReasonModal] = useState(false);
   const [selectedReason, setSelectedReason] = useState('');
+  const [audioUrl, setAudioUrl] = useState('');
+  const [isAudioPlaying, setIsAudioPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // أسباب التشتت
   const distractionReasons = [
@@ -38,6 +41,14 @@ export default function Home() {
     '🌐 تصفح إنترنت',
     '🎮 ألعاب',
     '✏️ أسباب أخرى'
+  ];
+
+  // أمثلة لروابط صوتية
+  const audioSuggestions = [
+    { name: '🌧 مطر هادئ', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3' },
+    { name: '🌊 أمواج البحر', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3' },
+    { name: '🔥 نار المدفأة', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3' },
+    { name: '🎹 بيانو هادئ', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3' },
   ];
 
   // المؤقت
@@ -63,6 +74,17 @@ export default function Home() {
       }
     }
   }, []);
+
+  // التحكم بالصوت عند بدء/إيقاف الجلسة
+  useEffect(() => {
+    if (isActive && audioUrl && audioRef.current) {
+      audioRef.current.play();
+      setIsAudioPlaying(true);
+    } else if (!isActive && audioRef.current) {
+      audioRef.current.pause();
+      setIsAudioPlaying(false);
+    }
+  }, [isActive, audioUrl]);
 
   // حساب الإحصائيات
   const totalMinutes = sessions.reduce((sum, s) => sum + (s.durationMinutes || 0), 0);
@@ -97,7 +119,7 @@ export default function Home() {
     if (selectedReason) {
       const newDistraction: DistractionLog = {
         id: Date.now().toString(),
-        timeFromStart: seconds, // الوقت من بداية الجلسة بالثواني
+        timeFromStart: seconds,
         reason: selectedReason
       };
       setCurrentDistractions([...currentDistractions, newDistraction]);
@@ -120,7 +142,6 @@ export default function Home() {
     setSessions(updated);
     localStorage.setItem('enjaz_sessions', JSON.stringify(updated));
     
-    // إعادة تعيين
     setIsActive(false);
     setSeconds(0);
     setCurrentDistractions([]);
@@ -191,45 +212,144 @@ export default function Home() {
 
         <div className="grid lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
-            {/* الموقت */}
-            <div className="bg-white/60 backdrop-blur-md rounded-3xl border border-[#8B9E6E]/20 shadow-xl p-8 text-center">
-              <div className="text-7xl font-mono font-bold mb-6 text-[#5C4B3A]">
-                {formatTime(seconds)}
-              </div>
+            {/* المؤقت بشكل ورقة منطوية - Paper Fold / Page Curl */}
+            <div className="relative">
+              {/* الظل الخلفي */}
+              <div className="absolute -bottom-2 left-4 right-4 h-4 bg-black/20 rounded-b-2xl blur-md"></div>
               
-              <div className="flex gap-4 justify-center mb-6 flex-wrap">
-                {!isActive ? (
-                  <button 
-                    onClick={startStudy} 
-                    className="px-8 py-3 rounded-2xl font-medium bg-[#8B9E6E] hover:bg-[#7A8D5E] text-white transition-all"
-                  >
-                    ▶ بدء الدراسة
-                  </button>
-                ) : (
-                  <>
-                    <button 
-                      onClick={pauseStudy} 
-                      className="px-6 py-3 rounded-2xl font-medium bg-[#D4C5B0] hover:bg-[#C9BAA5] text-[#5C4B3A] transition-all"
+              {/* الورقة الرئيسية */}
+              <div className="relative bg-[#FFF9F0] rounded-3xl shadow-2xl overflow-hidden">
+                {/* الجزء العلوي من الورقة */}
+                <div className="p-8 text-center">
+                  <div className="text-8xl font-mono font-bold mb-6 text-[#5C4B3A] tabular-nums">
+                    {formatTime(seconds)}
+                  </div>
+                  
+                  <div className="flex gap-4 justify-center mb-6 flex-wrap">
+                    {!isActive ? (
+                      <button 
+                        onClick={startStudy} 
+                        className="px-8 py-3 rounded-2xl font-medium bg-[#8B9E6E] hover:bg-[#7A8D5E] text-white transition-all shadow-lg"
+                      >
+                        ▶ بدء الدراسة
+                      </button>
+                    ) : (
+                      <>
+                        <button 
+                          onClick={pauseStudy} 
+                          className="px-6 py-3 rounded-2xl font-medium bg-[#D4C5B0] hover:bg-[#C9BAA5] text-[#5C4B3A] transition-all"
+                        >
+                          ⏸ إيقاف مؤقت
+                        </button>
+                        <button 
+                          onClick={endSession} 
+                          className="px-6 py-3 rounded-2xl font-medium bg-[#8B9E6E] hover:bg-[#7A8D5E] text-white transition-all shadow-lg"
+                        >
+                          ✅ إنهاء الجلسة
+                        </button>
+                      </>
+                    )}
+                  </div>
+
+                  {isActive && (
+                    <button
+                      onClick={addDistraction}
+                      className="w-full px-6 py-3 rounded-2xl font-medium bg-orange-500/20 hover:bg-orange-500/30 text-orange-700 border border-orange-500/30 transition-all"
                     >
-                      ⏸ إيقاف مؤقت
+                      🔔 تسجيل تشتت (تم تسجيل {currentDistractions.length})
                     </button>
-                    <button 
-                      onClick={endSession} 
-                      className="px-6 py-3 rounded-2xl font-medium bg-[#8B9E6E] hover:bg-[#7A8D5E] text-white transition-all"
-                    >
-                      ✅ إنهاء الجلسة
-                    </button>
-                  </>
-                )}
+                  )}
+                </div>
+
+                {/* جزء انطواء الورقة السفلي (Fold/Curl effect) */}
+                <div className="relative h-8 bg-gradient-to-b from-[#FFF9F0] to-[#EDE5D8]">
+                  <div className="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-r from-[#D4C5B0]/50 via-transparent to-[#D4C5B0]/50"></div>
+                </div>
+                
+                {/* زاوية الانطواء اليمنى السفلى */}
+                <div className="absolute bottom-0 right-0 w-16 h-16 overflow-hidden pointer-events-none">
+                  <div className="absolute bottom-0 right-0 w-16 h-16 bg-gradient-to-tl from-[#D4C5B0] via-[#E8DFD0] to-transparent transform rotate-45 origin-bottom-right shadow-lg"></div>
+                </div>
+              </div>
+            </div>
+
+            {/* قسم الصوت */}
+            <div className="bg-white/60 backdrop-blur-md rounded-3xl border border-[#8B9E6E]/20 shadow-xl p-6">
+              <h3 className="text-xl font-bold mb-4 text-[#5C4B3A]">🎵 أصوات للتركيز</h3>
+              
+              {/* حقل إدخال الرابط */}
+              <div className="mb-4">
+                <input
+                  type="text"
+                  value={audioUrl}
+                  onChange={(e) => setAudioUrl(e.target.value)}
+                  placeholder="أدخل رابط صوت (MP3) أو اختر من الأسفل..."
+                  className="w-full px-4 py-2 rounded-xl bg-white/60 border border-[#8B9E6E]/30 focus:outline-none focus:border-[#8B9E6E] text-[#5C4B3A] placeholder:text-[#8B9E6E]/50"
+                />
               </div>
 
-              {isActive && (
-                <button
-                  onClick={addDistraction}
-                  className="w-full px-6 py-3 rounded-2xl font-medium bg-orange-500/20 hover:bg-orange-500/30 text-orange-700 border border-orange-500/30 transition-all"
-                >
-                  🔔 تسجيل تشتت (تم تسجيل {currentDistractions.length})
-                </button>
+              {/* أزرار اقتراحات الصوت */}
+              <div className="flex flex-wrap gap-2 mb-4">
+                {audioSuggestions.map((audio) => (
+                  <button
+                    key={audio.url}
+                    onClick={() => setAudioUrl(audio.url)}
+                    className="px-3 py-1.5 rounded-xl text-sm bg-[#8B9E6E]/10 hover:bg-[#8B9E6E]/20 text-[#5C4B3A] transition-all border border-[#8B9E6E]/20"
+                  >
+                    {audio.name}
+                  </button>
+                ))}
+              </div>
+
+              {/* عنصر الصوت المخفي */}
+              {audioUrl && (
+                <audio
+                  ref={audioRef}
+                  src={audioUrl}
+                  loop
+                  className="hidden"
+                />
+              )}
+
+              {/* حالة تشغيل الصوت */}
+              {audioUrl && (
+                <div className="flex items-center justify-between p-3 rounded-xl bg-[#8B9E6E]/10 border border-[#8B9E6E]/20">
+                  <span className="text-sm text-[#5C4B3A] truncate flex-1">
+                    🎵 {audioUrl.length > 40 ? audioUrl.substring(0, 40) + '...' : audioUrl}
+                  </span>
+                  <div className="flex gap-2">
+                    {isAudioPlaying ? (
+                      <span className="text-xs text-[#8B9E6E] animate-pulse">🔊 يعمل</span>
+                    ) : (
+                      <span className="text-xs text-[#8B9E6E]/60">⏸ متوقف</span>
+                    )}
+                    <button
+                      onClick={() => {
+                        if (audioRef.current) {
+                          if (isAudioPlaying) {
+                            audioRef.current.pause();
+                            setIsAudioPlaying(false);
+                          } else {
+                            audioRef.current.play();
+                            setIsAudioPlaying(true);
+                          }
+                        }
+                      }}
+                      className="text-xs text-[#8B9E6E] hover:text-[#7A8D5E]"
+                    >
+                      {isAudioPlaying ? '⏸ إيقاف' : '▶ تشغيل'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setAudioUrl('');
+                        setIsAudioPlaying(false);
+                      }}
+                      className="text-xs text-red-500 hover:text-red-600"
+                    >
+                      ✖ إزالة
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
 
@@ -238,7 +358,7 @@ export default function Home() {
               <p className="text-[#5C4B3A] text-lg">💡 {getTip()}</p>
             </div>
 
-            {/* تاريخ الجلسات مع تفاصيل التشتت */}
+            {/* تاريخ الجلسات */}
             {sessions.length > 0 && (
               <div className="bg-white/60 rounded-3xl border border-[#8B9E6E]/20 shadow-xl p-6">
                 <h3 className="text-xl font-bold mb-4 text-[#5C4B3A]">📊 تاريخ الجلسات</h3>
@@ -254,7 +374,6 @@ export default function Home() {
                         </span>
                       </div>
                       
-                      {/* تفاصيل التشتتات مع الوقت من بداية الجلسة */}
                       {session.distractions && session.distractions.length > 0 && (
                         <div className="mt-2 mr-4">
                           <p className="text-sm font-semibold text-[#C4A27A] mb-1">📝 تفاصيل التشتت:</p>
