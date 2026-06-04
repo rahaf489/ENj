@@ -1,20 +1,9 @@
-// app/progress/page.tsx
-import Link from 'next/link';
-
-export default function ProgressPage() {
+export default function Progress() {
   return (
-    <div style={{ minHeight: '100vh', padding: '2rem', backgroundColor: '#EDE5D8' }}>
-      <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-        <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
-          <Link href="/" style={{ color: '#8B9E6E' }}>الرئيسية</Link>
-          <Link href="/progress" style={{ color: '#5C4B3A', fontWeight: 'bold' }}>التقدم</Link>
-          <Link href="/profile" style={{ color: '#8B9E6E' }}>الملف الشخصي</Link>
-        </div>
-        <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '1rem', textAlign: 'center' }}>
-          <h1 style={{ fontSize: '2rem', color: '#5C4B3A' }}>📊 التقدم والإنجاز</h1>
-          <p style={{ color: '#8B9E6E', marginTop: '1rem' }}>تم تحديث الصفحة بنجاح!</p>
-        </div>
-      </div>
+    <div>
+      <h1>صفحة التقدم</h1>
+      <p>هذه الصفحة تعمل!</p>
+      <a href="/">العودة للرئيسية</a>
     </div>
   );
 }
