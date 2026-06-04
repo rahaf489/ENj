@@ -471,7 +471,7 @@ export default function Home() {
           onClick={clearAllData}
           className="px-4 py-2 rounded-xl text-sm text-red-500/70 hover:text-red-600 transition-all bg-white/30 hover:bg-red-50"
         >
-          🗑 مسح جميع البيانات التجريبية
+          🗑 مسح جميع البيانات 
         </button>
         <p className="text-[#8B9E6E]/40 text-xs mt-2">
           ملاحظة: هذا الزر مخصص لمسح الجلسات التجريبية القصيرة
